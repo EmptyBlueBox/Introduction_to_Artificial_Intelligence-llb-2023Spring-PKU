@@ -138,7 +138,6 @@ def breadthFirstSearch(problem):
             n_state = next[0]
             n_direction = next[1]
             if n_state not in Visited:
-
                 Frontier.push((n_state, actions + [n_direction]))
                 Visited.append(n_state)
 
@@ -152,12 +151,14 @@ def uniformCostSearch(problem):
 
     pq = util.PriorityQueue()
     vis = []
-    vis.append(start)
     pq.push((start, []), 0)
     while not pq.isEmpty():
         state, actions = pq.pop()
         if problem.isGoalState(state):
             return actions
+        if state in vis:
+            continue
+        vis.append(state)  # visited when pop
         for next in problem.getSuccessors(state):
             n_state = next[0]
             if n_state not in vis:
@@ -165,7 +166,6 @@ def uniformCostSearch(problem):
                 nxt_actions = actions + [n_direction]
                 pq.push((n_state, nxt_actions),
                         problem.getCostOfActions(nxt_actions))
-                vis.append(n_state)  # 已访问=入队列
 
 
 def nullHeuristic(state, problem=None):
@@ -188,14 +188,14 @@ def aStarSearch(problem, heuristic=nullHeuristic):
     pq.push((start, []), 0+heuristic(start, problem))
     while not pq.isEmpty():
         state, actions = pq.pop()
-        if state in vis:  # 已访问=出队列时才有
-            continue
-        vis.append(state)
         if problem.isGoalState(state):
             return actions
+        if state in vis:
+            continue
+        vis.append(state)  # visited when pop
         for next in problem.getSuccessors(state):
             n_state = next[0]
-            if n_state not in vis:  # 无论如何都有
+            if n_state not in vis:
                 n_direction = next[1]
                 nxt_actions = actions + [n_direction]
                 nxt_cost = problem.getCostOfActions(nxt_actions)
