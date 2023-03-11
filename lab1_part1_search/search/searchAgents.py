@@ -411,7 +411,7 @@ def cornersHeuristic(state, problem):
     h_sum = 0
 
     "*** YOUR CODE HERE ***"
-    # 取遍历四个角的曼哈顿总距离贪心的最小值作为启发函数
+    # 取遍历四个角的曼哈顿总距离的贪心的最小值作为启发函数
     Unvisited_corners = [i for i in corners if i not in Visited_Corners]
     if not len(Unvisited_corners):
         return 0
