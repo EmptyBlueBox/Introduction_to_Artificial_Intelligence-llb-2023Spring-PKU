@@ -247,32 +247,31 @@ class MCTSAgent(MultiAgentSearchAgent):
             '''
 
             def __init__(self, data):
-                self.is_pacman = False
                 self.child_node = [None]*5  # 5个动作,N,E,W,S,Stop
+                # self.north = None
+                # self.east = None
+                # self.west = None
+                # self.south = None
+                # self.stop = None
                 self.parent = None
                 self.is_leaf = True  # 相对于已扩展的Monte Carlo Tree来说是否是叶子节点，新扩展的节点都是叶子节点
+                # self.is_pacman = False  # 是否是pacman节点
                 self.game_state = data[0]
                 self.numerator = data[1]
                 self.denominator = data[2]
 
         data = [gameState, 0, 1]  # data is the data of root node
         mct_root = Node(data)  # mct_root is the root of MCTS tree
-        mct_root.is_pacman = True  # root节点是pacman
         # AGENT_NUM is the number of agents in the game
         AGENT_NUM = gameState.getNumAgents()
         C = sqrt(2)  # C is the exploration constant
-        EPOCHS = 500  # 模拟次数 2000 500
-        DEPTH = 6  # 每次模拟的最大深度 20 6
-        THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10 10
-        NEAREST_K = 2  # 启发函数贪心最近的k个节点 1 2
+        EPOCHS = 500  # 模拟次数 2000
+        DEPTH = 15  # 每次模拟的最大深度 20
+        THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10
+        NEAREST_K = 1  # 启发函数贪心最近的k个节点 1
         index2action = ['North', 'East', 'West', 'South', 'Stop']
         action2index = {'North': 0, 'East': 1,
                         'West': 2, 'South': 3, 'Stop': 4}
-
-        pacman_pos = gameState.getPacmanPosition()
-        ghost_pos = gameState.getGhostPositions()
-        min_pacman_ghost_dis = min([manhattanDistance(pacman_pos, ghost_pos[i]) for i in range(
-            len(ghost_pos))])
 
         def Selection(node, agent_index):
             # 如果当前节点是胜利节点，直接返回1
@@ -323,18 +322,17 @@ class MCTSAgent(MultiAgentSearchAgent):
             else:
                 node.is_leaf = False  # 如果有合法动作，那么当前节点不是叶子节点
 
-            nxt_agent_index = (agent_index + 1) % AGENT_NUM  # 下一个agent的index
             can_simulate = []  # 可以模拟的动作
             for action in actions:
                 # 生成子节点
                 child_node = Node(
                     [node.game_state.generateSuccessor(agent_index, action), 0, 0])
                 child_node.parent = node
-                child_node.is_pacman = True if nxt_agent_index == 0 else False  # 判断子节点是pacman还是ghost
                 # 将子节点加入当前节点的子节点列表
                 node.child_node[action2index[action]] = child_node
                 can_simulate.append(child_node)  # 将子节点加入可以模拟的列表
 
+            nxt_agent_index = (agent_index + 1) % AGENT_NUM  # 下一个agent的index
             # 随机选择一个可以模拟的动作，返回1
             return True, random.choice(can_simulate), nxt_agent_index
 
@@ -359,7 +357,7 @@ class MCTSAgent(MultiAgentSearchAgent):
 
         def Backpropagation(node, is_win):
             while node is not None:
-                node.numerator += is_win ^ node.is_pacman
+                node.numerator += is_win
                 node.denominator += 1
                 node = node.parent
 
@@ -393,16 +391,16 @@ class MCTSAgent(MultiAgentSearchAgent):
         # ghost_pos = gameState.getGhostPositions()
         # min_pacman_ghost_dis = min([manhattanDistance(pacman_pos, ghost_pos[i]) for i in range(
         #     len(ghost_pos))])
-        # if min_pacman_ghost_dis >= 6:  # 如果pacman和ghost的距离大于等于3，那么直接返回最大的合法动作
-        #     actions = (gameState.getLegalActions(0))  # 获取所有合法动作
-        #     max_score = float('-inf')  # 初始化最大分数
-        #     ans_action = None  # 初始化最优动作
-        #     for action in actions:  # 遍历所有合法动作
-        #         nxt_state = gameState.generateSuccessor(0, action)  # 生成下一个状态
-        #         tmp_score = nxt_state.getScore()  # 获取下一个状态的分数
-        #         food_pos = nxt_state.getFood().asList()  # 获取下一个状态的food的位置
+        # if min_pacman_ghost_dis >= 3:  # 如果pacman和ghost的距离大于等于3，那么直接返回最大的合法动作
+        #     actions = (gameState.getLegalActions(0))
+        #     max_score = float('-inf')
+        #     ans_action = None
+        #     for action in actions:
+        #         nxt_state = gameState.generateSuccessor(0, action)
+        #         tmp_score = nxt_state.getScore()
+        #         food_pos = nxt_state.getFood().asList()
         #         min_pacman_food_dis = min([manhattanDistance(pacman_pos, food_pos[i]) for i in range(
-        #             len(food_pos))]) if len(food_pos) > 0 else 0  # pacman到food的最小距离
+        #             len(food_pos))])
         #         tmp_score -= min_pacman_food_dis
         #         if tmp_score > max_score:
         #             max_score = tmp_score
