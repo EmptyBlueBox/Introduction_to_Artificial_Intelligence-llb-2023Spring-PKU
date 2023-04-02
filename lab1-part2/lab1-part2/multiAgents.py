@@ -261,18 +261,23 @@ class MCTSAgent(MultiAgentSearchAgent):
         # AGENT_NUM is the number of agents in the game
         AGENT_NUM = gameState.getNumAgents()
         C = sqrt(2)  # C is the exploration constant
-        EPOCHS = 500  # 模拟次数 2000 500
-        DEPTH = 6  # 每次模拟的最大深度 20 6
-        THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10 10
-        NEAREST_K = 2  # 启发函数贪心最近的k个节点 1 2
+        EPOCHS = 500  # 模拟次数 500
+        DEPTH = 6  # 每次模拟的最大深度 6
+        THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10
+        NEAREST_K = 10  # 启发函数贪心最近的k个节点 10
+        GREEDY_THRESHOLD = 3  # 启发函数贪心的阈值，距离ghost太远就直接搜出来一条距离food最近的路
         index2action = ['North', 'East', 'West', 'South', 'Stop']
         action2index = {'North': 0, 'East': 1,
                         'West': 2, 'South': 3, 'Stop': 4}
+        action2dir = {'West': (-1, 0), 'Stop': (0, 0),
+                      'East': (1, 0), 'North': (0, 1), 'South': (0, -1)}
+        dir = [(-1, 0), (0, 1), (0, -1), (1, 0)]
 
-        pacman_pos = gameState.getPacmanPosition()
-        ghost_pos = gameState.getGhostPositions()
-        min_pacman_ghost_dis = min([manhattanDistance(pacman_pos, ghost_pos[i]) for i in range(
-            len(ghost_pos))])
+        ori_pacman_pos = gameState.getPacmanPosition()
+        ori_ghost_pos = gameState.getGhostPositions()
+        ori_food_pos = gameState.getFood().asList()
+        ori_capsule_pos = gameState.getCapsules()
+        ori_food_pos += ori_capsule_pos
 
         def Selection(node, agent_index):
             # 如果当前节点是胜利节点，直接返回1
@@ -387,27 +392,59 @@ class MCTSAgent(MultiAgentSearchAgent):
                 del food_pos[min_index]  # 删除已经计算过的food
                 if CNT == NEAREST_K:
                     break
+                CNT += 1
+
             return current_score+min_pacman_ghost_dis-sum_pacman_food_dis
 
-        # pacman_pos = gameState.getPacmanPosition()
-        # ghost_pos = gameState.getGhostPositions()
-        # min_pacman_ghost_dis = min([manhattanDistance(pacman_pos, ghost_pos[i]) for i in range(
-        #     len(ghost_pos))])
-        # if min_pacman_ghost_dis >= 6:  # 如果pacman和ghost的距离大于等于3，那么直接返回最大的合法动作
-        #     actions = (gameState.getLegalActions(0))  # 获取所有合法动作
-        #     max_score = float('-inf')  # 初始化最大分数
-        #     ans_action = None  # 初始化最优动作
-        #     for action in actions:  # 遍历所有合法动作
-        #         nxt_state = gameState.generateSuccessor(0, action)  # 生成下一个状态
-        #         tmp_score = nxt_state.getScore()  # 获取下一个状态的分数
-        #         food_pos = nxt_state.getFood().asList()  # 获取下一个状态的food的位置
-        #         min_pacman_food_dis = min([manhattanDistance(pacman_pos, food_pos[i]) for i in range(
-        #             len(food_pos))]) if len(food_pos) > 0 else 0  # pacman到food的最小距离
-        #         tmp_score -= min_pacman_food_dis
-        #         if tmp_score > max_score:
-        #             max_score = tmp_score
-        #             ans_action = action
-        #     return ans_action
+        def BFS_using_coordinate():
+            frontier = util.Queue()
+            vis = [ori_pacman_pos]
+            # 先将第一步存起来，方便最后返回答案
+            first_actions = gameState.getLegalActions(0)
+            x0, y0 = ori_pacman_pos
+            for first_action in first_actions:
+                dx, dy = action2dir[first_action]
+                xx, yy = x0+dx, y0+dy
+                frontier.push((xx, yy, first_action))
+                vis.append((xx, yy))
+                if (xx, yy) in ori_food_pos:
+                    return first_action
+            walls = gameState.getWalls()
+            while frontier.isEmpty() == False:
+                x, y, action = frontier.pop()
+                if (x, y) in ori_food_pos:
+                    return action
+                for i in range(4):
+                    dx, dy = dir[i]
+                    xx, yy = x+dx, y+dy
+                    if walls[xx][yy] or (xx, yy) in vis:
+                        continue
+                    frontier.push((xx, yy, action))
+                    vis.append((xx, yy))
+
+        def BFS_find_ghost():
+            x0, y0 = ori_pacman_pos
+            frontier = util.Queue()
+            frontier.push((x0, y0, 0))
+            vis = [(x0, y0)]
+            walls = gameState.getWalls()
+
+            while frontier.isEmpty() == False:
+                x, y, dis = frontier.pop()
+                # ghost的坐标是小数
+                if (x, y) in ori_ghost_pos or (x+0.5, y) in ori_ghost_pos or (x-0.5, y) in ori_ghost_pos or (x, y+0.5) in ori_ghost_pos or (x, y-0.5) in ori_ghost_pos:
+                    return dis
+                for i in range(4):
+                    dx, dy = dir[i]
+                    xx, yy = x+dx, y+dy
+                    if walls[xx][yy] or (xx, yy) in vis:
+                        continue
+                    frontier.push((xx, yy, dis+1))
+                    vis.append((xx, yy))
+
+        ori_min_pacman_ghost_dis = BFS_find_ghost()
+        if ori_min_pacman_ghost_dis >= GREEDY_THRESHOLD:
+            return BFS_using_coordinate()
 
         for epoch in range(EPOCHS):  # 进行EPOCHS次迭代
             win_or_lose, leaf, leaf_agent_index = Selection(mct_root, 0)  # 选择
