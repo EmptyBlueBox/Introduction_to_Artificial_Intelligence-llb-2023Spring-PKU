@@ -238,6 +238,9 @@ class MCTSAgent(MultiAgentSearchAgent):
     """
       Your MCTS agent with Monte Carlo Tree Search (question 3)
     """
+    CNT_HEURISTIC = 0  # 启发函数计算次数
+    THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10
+    THRESHOLD_OF_AVG = 0.1  # 模拟时取游戏胜利的阈值是平均值的几倍 0.1
 
     def getAction(self, gameState):
 
@@ -261,11 +264,10 @@ class MCTSAgent(MultiAgentSearchAgent):
         # AGENT_NUM is the number of agents in the game
         AGENT_NUM = gameState.getNumAgents()
         C = sqrt(2)  # C is the exploration constant
-        EPOCHS = 500  # 模拟次数 500
-        DEPTH = 6  # 每次模拟的最大深度 6
-        THRESHOLD = 10  # 模拟时取游戏胜利的阈值 10
-        NEAREST_K = 10  # 启发函数贪心最近的k个节点 10
-        GREEDY_THRESHOLD = 3  # 启发函数贪心的阈值，距离ghost太远就直接搜出来一条距离food最近的路
+        EPOCHS = 200  # 模拟次数 200 500
+        DEPTH = 2  # 每次模拟的最大深度 2 6
+        NEAREST_K = 10  # 启发函数贪心最近的k个节点，对时间影响不大 10
+        GREEDY_THRESHOLD = 3  # 启发函数贪心的阈值，距离ghost太远就直接搜出来一条距离food最近的路，大图越高越好 3 5
         index2action = ['North', 'East', 'West', 'South', 'Stop']
         action2index = {'North': 0, 'East': 1,
                         'West': 2, 'South': 3, 'Stop': 4}
@@ -273,11 +275,22 @@ class MCTSAgent(MultiAgentSearchAgent):
                       'East': (1, 0), 'North': (0, 1), 'South': (0, -1)}
         dir = [(-1, 0), (0, 1), (0, -1), (1, 0)]
 
-        ori_pacman_pos = gameState.getPacmanPosition()
-        ori_ghost_pos = gameState.getGhostPositions()
-        ori_food_pos = gameState.getFood().asList()
-        ori_capsule_pos = gameState.getCapsules()
-        ori_food_pos += ori_capsule_pos
+        ori_pacman_pos = gameState.getPacmanPosition()  # pacman的初始位置
+        ori_not_scared_ghost_pos = []  # not scared ghost的初始位置
+        ori_scared_ghost_pos = []  # scared ghost的初始位置
+
+        for ghost_index in range(1, AGENT_NUM):  # 找scared ghost和not scared ghost
+            if gameState.getGhostState(ghost_index).scaredTimer > 0:
+                ori_scared_ghost_pos.append(
+                    gameState.getGhostPosition(ghost_index))
+            else:
+                ori_not_scared_ghost_pos.append(
+                    gameState.getGhostPosition(ghost_index))
+
+        ori_capsule_pos = gameState.getCapsules()  # capsule的初始位置
+        ori_food_pos = gameState.getFood().asList()  # food的初始位置
+        ori_eatable_pos = ori_food_pos + ori_capsule_pos + \
+            ori_scared_ghost_pos  # 可以吃的东西的初始位置
 
         def Selection(node, agent_index):
             # 如果当前节点是胜利节点，直接返回1
@@ -360,7 +373,12 @@ class MCTSAgent(MultiAgentSearchAgent):
                         index, random.choice(actions))
                     index = (index + 1) % AGENT_NUM
             # 这个节点最后没有得到确定的结果，返回启发式函数的结果，函数越大越认为是胜利节点
-            return HeuristicFunction(state) >= THRESHOLD
+            heuristic_val = HeuristicFunction(state)
+            MCTSAgent.THRESHOLD = (MCTSAgent.THRESHOLD*(MCTSAgent.CNT_HEURISTIC-1) +
+                                   heuristic_val)/MCTSAgent.CNT_HEURISTIC
+            ans = (heuristic_val >= MCTSAgent.THRESHOLD_OF_AVG*MCTSAgent.THRESHOLD)
+            return ans
+            # return HeuristicFunction(state) >= MCTSAgent.THRESHOLD
 
         def Backpropagation(node, is_win):
             while node is not None:
@@ -369,6 +387,7 @@ class MCTSAgent(MultiAgentSearchAgent):
                 node = node.parent
 
         def HeuristicFunction(game_state):
+            MCTSAgent.CNT_HEURISTIC += 1  # 统计启发式函数的调用次数
             current_score = game_state.getScore()
             pacman_pos = game_state.getPacmanPosition()
             ghost_pos = game_state.getGhostPositions()
@@ -394,25 +413,25 @@ class MCTSAgent(MultiAgentSearchAgent):
                     break
                 CNT += 1
 
-            return current_score+min_pacman_ghost_dis-sum_pacman_food_dis
+            return current_score+min_pacman_ghost_dis**2-sum_pacman_food_dis
+            # return min_pacman_ghost_dis**2-sum_pacman_food_dis
 
-        def BFS_using_coordinate():
+        def BFS_using_coordinate():  # 使用坐标找距离最近的food（包括capsule和scared ghost）
             frontier = util.Queue()
             vis = [ori_pacman_pos]
-            # 先将第一步存起来，方便最后返回答案
             first_actions = gameState.getLegalActions(0)
             x0, y0 = ori_pacman_pos
-            for first_action in first_actions:
+            for first_action in first_actions:  # 先将第一步的所有可能的动作加入队列
                 dx, dy = action2dir[first_action]
                 xx, yy = x0+dx, y0+dy
                 frontier.push((xx, yy, first_action))
                 vis.append((xx, yy))
-                if (xx, yy) in ori_food_pos:
+                if (xx, yy) in ori_eatable_pos:
                     return first_action
             walls = gameState.getWalls()
             while frontier.isEmpty() == False:
                 x, y, action = frontier.pop()
-                if (x, y) in ori_food_pos:
+                if (x, y) in ori_eatable_pos or (x+0.5, y) in ori_eatable_pos or (x, y+0.5) in ori_eatable_pos:
                     return action
                 for i in range(4):
                     dx, dy = dir[i]
@@ -422,7 +441,7 @@ class MCTSAgent(MultiAgentSearchAgent):
                     frontier.push((xx, yy, action))
                     vis.append((xx, yy))
 
-        def BFS_find_ghost():
+        def BFS_find_not_scared_ghost():  # 找到最近的非吃豆人状态的ghost的距离
             x0, y0 = ori_pacman_pos
             frontier = util.Queue()
             frontier.push((x0, y0, 0))
@@ -432,7 +451,7 @@ class MCTSAgent(MultiAgentSearchAgent):
             while frontier.isEmpty() == False:
                 x, y, dis = frontier.pop()
                 # ghost的坐标是小数
-                if (x, y) in ori_ghost_pos or (x+0.5, y) in ori_ghost_pos or (x-0.5, y) in ori_ghost_pos or (x, y+0.5) in ori_ghost_pos or (x, y-0.5) in ori_ghost_pos:
+                if (x, y) in ori_not_scared_ghost_pos or (x+0.5, y) in ori_not_scared_ghost_pos or (x, y+0.5) in ori_not_scared_ghost_pos:
                     return dis
                 for i in range(4):
                     dx, dy = dir[i]
@@ -441,8 +460,9 @@ class MCTSAgent(MultiAgentSearchAgent):
                         continue
                     frontier.push((xx, yy, dis+1))
                     vis.append((xx, yy))
+            return float('inf')  # 没有找到非吃豆人状态的ghost
 
-        ori_min_pacman_ghost_dis = BFS_find_ghost()
+        ori_min_pacman_ghost_dis = BFS_find_not_scared_ghost()
         if ori_min_pacman_ghost_dis >= GREEDY_THRESHOLD:
             return BFS_using_coordinate()
 
@@ -459,11 +479,12 @@ class MCTSAgent(MultiAgentSearchAgent):
 
         ans = None
         max_Q = -float('inf')
-        for i in range(5):
+        for i in range(5 if ori_min_pacman_ghost_dis > 1 else 4):
             if mct_root.child_node[i] is not None:
                 tmp_Q = mct_root.child_node[i].numerator / \
                     mct_root.child_node[i].denominator
                 if tmp_Q > max_Q:
                     max_Q = tmp_Q
                     ans = i
+        # print(index2action[ans])
         return index2action[ans]
