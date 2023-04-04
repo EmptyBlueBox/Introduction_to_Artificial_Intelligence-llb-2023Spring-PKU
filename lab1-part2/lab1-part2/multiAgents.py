@@ -419,26 +419,26 @@ class MCTSAgent(MultiAgentSearchAgent):
         def BFS_using_coordinate():  # 使用坐标找距离最近的food（包括capsule和scared ghost）
             frontier = util.Queue()
             vis = [ori_pacman_pos]
-            first_actions = gameState.getLegalActions(0)
-            x0, y0 = ori_pacman_pos
+            first_actions = gameState.getLegalActions(0)  # 获取pacman的所有合法动作
+            x0, y0 = ori_pacman_pos  # 获取pacman的坐标
             for first_action in first_actions:  # 先将第一步的所有可能的动作加入队列
-                dx, dy = action2dir[first_action]
-                xx, yy = x0+dx, y0+dy
-                frontier.push((xx, yy, first_action))
-                vis.append((xx, yy))
-                if (xx, yy) in ori_eatable_pos:
+                dx, dy = action2dir[first_action]  # 获取第一步的方向
+                xx, yy = x0+dx, y0+dy  # 计算第一步的坐标
+                frontier.push((xx, yy, first_action))  # 将第一步的坐标和方向加入队列
+                vis.append((xx, yy))  # 将第一步的坐标加入已访问列表
+                if (xx, yy) in ori_eatable_pos:  # 如果第一步就可以吃到food，直接返回
                     return first_action
-            walls = gameState.getWalls()
-            while frontier.isEmpty() == False:
-                x, y, action = frontier.pop()
-                if (x, y) in ori_eatable_pos or (x+0.5, y) in ori_eatable_pos or (x, y+0.5) in ori_eatable_pos:
+            walls = gameState.getWalls()  # 获取墙的信息
+            while frontier.isEmpty() == False:  # 如果队列不为空
+                x, y, action = frontier.pop()  # 弹出队列头部的元素
+                if (x, y) in ori_eatable_pos or (x+0.5, y) in ori_eatable_pos or (x, y+0.5) in ori_eatable_pos:  # 如果弹出的元素是food，直接返回
                     return action
-                for i in range(4):
-                    dx, dy = dir[i]
-                    xx, yy = x+dx, y+dy
-                    if walls[xx][yy] or (xx, yy) in vis:
+                for i in range(4):  # 否则将该元素的四个方向的元素加入队列
+                    dx, dy = dir[i]  # 获取方向
+                    xx, yy = x+dx, y+dy  # 计算坐标
+                    if walls[xx][yy] or (xx, yy) in vis:  # 如果是墙或者已经访问过，跳过
                         continue
-                    frontier.push((xx, yy, action))
+                    frontier.push((xx, yy, action))  # 将坐标和方向加入队列
                     vis.append((xx, yy))
 
         def BFS_find_not_scared_ghost():  # 找到最近的非吃豆人状态的ghost的距离
@@ -462,9 +462,9 @@ class MCTSAgent(MultiAgentSearchAgent):
                     vis.append((xx, yy))
             return float('inf')  # 没有找到非吃豆人状态的ghost
 
-        ori_min_pacman_ghost_dis = BFS_find_not_scared_ghost()
-        if ori_min_pacman_ghost_dis >= GREEDY_THRESHOLD:
-            return BFS_using_coordinate()
+        ori_min_pacman_ghost_dis = BFS_find_not_scared_ghost()  # 找到最近的非吃豆人状态的ghost的距离
+        if ori_min_pacman_ghost_dis >= GREEDY_THRESHOLD:  # 如果距离大于阈值，使用贪心算法
+            return BFS_using_coordinate()  # 使用坐标找距离最近的food（包括capsule和scared ghost）
 
         for epoch in range(EPOCHS):  # 进行EPOCHS次迭代
             win_or_lose, leaf, leaf_agent_index = Selection(mct_root, 0)  # 选择
@@ -479,7 +479,7 @@ class MCTSAgent(MultiAgentSearchAgent):
 
         ans = None
         max_Q = -float('inf')
-        for i in range(5 if ori_min_pacman_ghost_dis > 1 else 4):
+        for i in range(5 if ori_min_pacman_ghost_dis > 1 else 4):  # 如果ghost距离大于1，那么可以选择STOP
             if mct_root.child_node[i] is not None:
                 tmp_Q = mct_root.child_node[i].numerator / \
                     mct_root.child_node[i].denominator
