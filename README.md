@@ -1,1 +1,7 @@
-# 2023_Spring_PKU_Introduction_to_Artificial_Intelligence
+# Introduction_to_Artificial_Intelligence-llb-2023Spring-PKU
+
+This is the repository for the course Introduction to Artificial Intelligence in 2023 Spring.
+
+1. notes
+2. assignments
+3. python exercises
