@@ -5,3 +5,5 @@ This is the repository for the course Introduction to Artificial Intelligence in
 1. notes
 2. assignments
 3. python exercises
+
+Welcome to my [Course Review](https://www.lyt0112.com/blog/course_review-zh) !
